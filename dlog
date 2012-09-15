@@ -1,0 +1,296 @@
+[1mdiff --git a/TideWeatherAPRS.ino b/TideWeatherAPRS.ino[m
+[1mindex 326483b..7b3f0a7 100644[m
+[1m--- a/TideWeatherAPRS.ino[m
+[1m+++ b/TideWeatherAPRS.ino[m
+[36m@@ -59,6 +59,12 @@[m [mConnect SCL to i2c clock - on '168/'328 Arduino Uno/Duemilanove/etc thats Analog[m
+ Connect SDA to i2c data - on '168/'328 Arduino Uno/Duemilanove/etc thats Analog 4[m
+ EOC is not used, it signifies an end of conversion[m
+ XCLR is a reset pin, also not used here[m
+[32m+[m
+[32m+[m[32mFor the Sonar Distance Measuring, use Serial[m
+[32m+[m[32mgnd to gnd[m
+[32m+[m[32m5v to 5v[m
+[32m+[m[32mArduino Pin 0 (serial rx) to Sensor pin tx[m
+[32m+[m[32mArduino digital Pin 2 to Sensor pin rx[m[41m [m
+  [m
+  */[m
+ [m
+[36m@@ -68,6 +74,9 @@[m [mXCLR is a reset pin, also not used here[m
+ // Temp and Barom[m
+ #include <Wire.h>                       [m
+ #include <Adafruit_BMP085.h>[m
+[32m+[m[32m// Serial tools[m
+[32m+[m[32m// #include <Serial.h>   not sure this is the right one or if even needed[m
+[32m+[m[32m//[m
+ // initialize the library with the numbers of the interface pins, same order as description above[m
+  LiquidCrystal lcd(8, 9, 4, 5, 6, 7);[m
+  int k;[m
+[36m@@ -79,10 +88,12 @@[m [mXCLR is a reset pin, also not used here[m
+  char LUM[4];[m
+  char PLUM[3]; // for assembling the packet of 3 integers from LUM[m
+  char packet[45];[m
+[32m+[m[32m // flags[m
+[32m+[m[32m int flagRadioTransmit;[m
+ // [m
+[31m- //[m
+[31m- // Items needed for barometer and temperature[m
+[31m- //[m
+[32m+[m[32m//[m
+[32m+[m[32m// Items needed for barometer and temperature[m
+[32m+[m[32m//[m
+  Adafruit_BMP085 bmp;   // For Temp and Barom [m
+  int t;   // temp in F[m
+  float b;   // barometric pressure[m
+[36m@@ -92,29 +103,42 @@[m [mXCLR is a reset pin, also not used here[m
+  int photocellPin = 1;     // the cell and 10K pulldown are connected to a1[m
+  int photocellReading;     // the analog reading from the sensor divider[m
+  //[m
+[32m+[m[32m // Items needed for sonar[m
+[32m+[m[32m //[m
+[32m+[m[32m int conta=0;[m
+[32m+[m[32m int byteGPS=-1;[m
+[32m+[m[32m char linea[5] = "";[m
+  [m
+ void setup(){[m
+[32m+[m[32m  //[m
+   // set up the LCD's number of columns and rows:[m
+   pinMode(13, OUTPUT);   [m
+[32m+[m[32m  pinMode(3, OUTPUT);[m[41m   [m
+[32m+[m[32m  byteGPS=-1;[m
+[32m+[m[32m  //[m
+[32m+[m[32m  //[m
+[32m+[m[32m  //[m
+   lcd.begin(16, 2);[m
+   lcd.print("Hi Doug");  //so i know it is working[m
+   // initialize the serial communications:[m
+[31m-  Serial.begin(4800);[m
+[32m+[m[32m  Serial.begin(9600);                                                         //  sonar at 9600  !!!!!!!!!!!!  bmp at 4800 ??????![m
+   // initialize I2C with temp and barom[m
+   //[m
+   bmp.begin();   // For Temp and Barom[m
+ }[m
+ [m
+ void loop() {[m
+[32m+[m[32m  flagRadioTransmit = 1;    // 0 off, 1 on[m
+   //[m
+   digitalWrite(13, LOW);[m
+[32m+[m[32m  digitalWrite(3, LOW);[m
+   lcd.clear();[m
+   delay(30);[m
+[31m-    // [m
+[31m-    // Do the photocell[m
+[31m-    //[m
+[31m-     photocellReading = analogRead(photocellPin);  // reads an integer off the pin that could be 1, 2 or 3 digits[m
+[31m-     if (photocellReading > 99) [m
+[32m+[m[32m  //[m[41m [m
+[32m+[m[32m  // Do the photocell[m
+[32m+[m[32m  //[m
+[32m+[m[32m  photocellReading = analogRead(photocellPin);  // reads an integer off the pin that could be 1, 2 or 3 digits[m
+[32m+[m[32m  if (photocellReading > 99)[m[41m [m
+      {[m
+      String LUM = String(photocellReading);[m
+ //     lcd.print("Lumino>99 ");[m
+[36m@@ -139,26 +163,26 @@[m [mvoid loop() {[m
+      PLUM[1] = LUM[0];[m
+      PLUM[2] = LUM[1];[m
+      }[m
+[31m-     lcd.print("Lumino= ");[m
+[31m-     lcd.print(PLUM[0]);[m
+[31m-     lcd.print(PLUM[1]); [m
+[31m-     lcd.print(PLUM[2]);[m
+[31m- //    lcd.print(" S");  [m
+[31m-     lcd.setCursor(0,1);[m
+[31m-     lcd.print(photocellReading);[m
+[31m-     //[m
+[31m-     delay(5000);[m
+[31m-     lcd.clear(); [m
+[31m-   //[m
+[31m-   // Do the temp and barometer reading[m
+[31m-   //[m
+[31m-     lcd.print("Temp = ");[m
+[31m-   //  lcd.print(round(bmp.readTemperature()*9.0/5.0+32.0));[m
+[31m-   //  lcd.print(" *F");[m
+[31m-   //  lcd.setCursor(0,1);[m
+[31m-     t = int(bmp.readTemperature()*9.0/5.0+32.0);[m
+[31m-   //  dtostrf(t,3, 0, TMP); // float to string in stdlib is dtostrf(FLOAT,WIDTH,PRECSISION,BUFFER);[m
+[31m-     if (t > 99) [m
+[32m+[m[32m  lcd.print("Lumino= ");[m
+[32m+[m[32m  lcd.print(PLUM[0]);[m
+[32m+[m[32m  lcd.print(PLUM[1]);[m[41m [m
+[32m+[m[32m  lcd.print(PLUM[2]);[m
+[32m+[m[32m  //    lcd.print(" S");[m[41m  [m
+[32m+[m[32m  lcd.setCursor(0,1);[m
+[32m+[m[32m  lcd.print(photocellReading);[m
+[32m+[m[32m  //[m
+[32m+[m[32m  delay(1000);[m
+[32m+[m[32m  lcd.clear();[m[41m [m
+[32m+[m[32m  //[m
+[32m+[m[32m  // Do the temp and barometer reading[m
+[32m+[m[32m  //[m
+[32m+[m[32m  lcd.print("Temp = ");[m
+[32m+[m[32m  //  lcd.print(round(bmp.readTemperature()*9.0/5.0+32.0));[m
+[32m+[m[32m  //  lcd.print(" *F");[m
+[32m+[m[32m  //  lcd.setCursor(0,1);[m
+[32m+[m[32m  t = int(bmp.readTemperature()*9.0/5.0+32.0);[m
+[32m+[m[32m  //  dtostrf(t,3, 0, TMP); // float to string in stdlib is dtostrf(FLOAT,WIDTH,PRECSISION,BUFFER);[m
+[32m+[m[32m    if (t > 99)[m[41m [m
+      {[m
+      String TMP = String(t);[m
+      PTMP[0] = TMP[0];[m
+[36m@@ -179,36 +203,81 @@[m [mvoid loop() {[m
+      PTMP[1] = TMP[0];[m
+      PTMP[2] = TMP[1];[m
+      }[m
+[31m-     lcd.print(PTMP[0]);[m
+[31m-     lcd.print(PTMP[1]); [m
+[31m-     lcd.print(PTMP[2]);[m
+[31m-     lcd.print(" *F");[m
+[31m-     lcd.setCursor(0,1);[m
+[31m-     //[m
+[31m-     lcd.print("Pres= ");[m
+[31m-     // divide Pa by 100 to bet hPa which is also mb then divide by adjustment factor[m
+[31m-     // lcd.print((bmp.readPressure()/100.0)-0);[m
+[31m-     // lcd.println(" mb ");[m
+[31m-     b=bmp.readPressure()/100.0-0;[m
+[31m-     dtostrf(b,4, 1, BAROM); // float to string in stdlib is dtostrf(FLOAT,WIDTH,PRECSISION,BUFFER);[m
+[31m-     lcd.print(BAROM);[m
+[31m-     lcd.println(" mb ");[m
+[31m-     delay(5000);[m
+[31m-     lcd.clear();[m
+[31m-   //[m
+[31m-   // Assemble Packet[m
+[31m-   //[m
+[31m- //   this was pulled from a raw pkt from a weather station   !3839.35N/12120.19W_232/002g006t072r000P000p000h51b10138.VWS-DavisVVue   [m
+[31m-// This worked   String  packet[45] = "!3812.43N/12234.14W_000/000t086b10065L340F+030" ; at least on the th-d72a did not try to digi it[m
+[31m-//                  012345678901234567890123456789012345678901234567890123456789[m
+[31m-//                  0         1         2         3         4         5[m
+[31m-// This worked   char packet[68] = "!3812.43N/12234.14W_000/000t086L340b10065F+030" ;[m
+[31m-// Page 65 of aprs protocol version 1.0, t=056 deg F, Lumin=320, barom=1008.5, Flood=-3.5[m
+[31m-// Has Petaluma coords, need to overwrite data after the wind and gust[m
+[32m+[m[32m  lcd.print(PTMP[0]);[m
+[32m+[m[32m  lcd.print(PTMP[1]);[m[41m [m
+[32m+[m[32m  lcd.print(PTMP[2]);[m
+[32m+[m[32m  lcd.print(" *F");[m
+[32m+[m[32m  lcd.setCursor(0,1);[m
+[32m+[m[32m  //[m
+[32m+[m[32m  lcd.print("Pres= ");[m
+[32m+[m[32m  // divide Pa by 100 to bet hPa which is also mb then divide by adjustment factor[m
+[32m+[m[32m  // lcd.print((bmp.readPressure()/100.0)-0);[m
+[32m+[m[32m  // lcd.println(" mb ");[m
+[32m+[m[32m  b=bmp.readPressure()/100.0-0;[m
+[32m+[m[32m  dtostrf(b,4, 1, BAROM); // float to string in stdlib is dtostrf(FLOAT,WIDTH,PRECSISION,BUFFER);[m
+[32m+[m[32m  lcd.print(BAROM);[m
+[32m+[m[32m  lcd.println(" mb ");[m
+[32m+[m[32m  delay(1000);[m
+[32m+[m[32m  lcd.clear();[m
+[32m+[m[32m  //[m
+[32m+[m[32m  // Do the sonar distance measuring[m
+[32m+[m[32m  //[m
+[32m+[m[32m  digitalWrite(3, HIGH);[m
+[32m+[m[32m  delay(200);[m[41m [m
+[32m+[m[32m//  byteGPS=Serial.read();[m[41m [m
+[32m+[m[32m//  linea[0] = byteGPS;[m
+[32m+[m[32m//    byteGPS=Serial.read();[m[41m [m
+[32m+[m[32m//  linea[1] = byteGPS;[m
+[32m+[m[32m//  byteGPS=Serial.read();[m[41m [m
+[32m+[m[32m//  linea[2] = byteGPS;[m
+[32m+[m[32m//  byteGPS=Serial.read();[m[41m [m
+[32m+[m[32m//  linea[3] = byteGPS;[m
+[32m+[m[32m//  byteGPS=Serial.read();[m[41m [m
+[32m+[m[32m//  linea[4] = byteGPS;[m
+ //[m
+[32m+[m[32m//[m[41m [m
+[32m+[m[32m  byteGPS=Serial.read();         // Read a byte of the serial port[m
+[32m+[m[32m  if (byteGPS == -1) {           // See if the port is empty and if so leave the sonar alone and move on to next thing[m
+[32m+[m[32m//    delay(25);[m[41m   [m
+[32m+[m[32m//      lcd.println("no bytes");[m
+[32m+[m[32m//      delay(2500);[m[41m   [m
+[32m+[m[32m//    } else {[m
+[32m+[m[32m//    for (i=1;i<5;i++){          // if not empty, then you got something, so Read 10 bytes, which takes 10*49ms = 490ms[m
+[32m+[m[32m//      linea[i-1]=byteGPS;        // If there is serial port data, it is put in the buffer[m
+[32m+[m[32m//      byteGPS=Serial.read();     // Read next byte of the serial port[m
+[32m+[m[32m//     i++;[m[41m                      [m
+[32m+[m[32m      // if (byteGPS==13){            // If the received byte is = to 13, end of transmission[m
+[32m+[m[32m      //  digitalWrite(13, LOW);[m[41m [m
+[32m+[m[32m      //  }[m
+[32m+[m[32m//      }[m[41m [m
+[32m+[m[32m//    }[m
+[32m+[m[32m//  for (i=1;i<5;i++){[m[41m [m
+[32m+[m[32m//      lcd.print(linea[i-1]);[m
+[32m+[m[32m//      i++;[m[41m                      [m
+[32m+[m[32m//      }[m
+[32m+[m[32m    lcd.print(linea[0]);[m
+[32m+[m[32m    lcd.print(linea[1]);[m
+[32m+[m[32m    lcd.print(linea[2]);[m
+[32m+[m[32m    lcd.print(linea[3]);[m
+[32m+[m[32m    lcd.print(linea[4]);[m
+[32m+[m[32m//  lcd.println("end");[m
+[32m+[m[32m  delay(5000);[m
+[32m+[m[32m  lcd.clear();[m
+[32m+[m[32m    digitalWrite(3, LOW);[m
+[32m+[m[32m  //[m
+[32m+[m[32m  // Assemble Packet[m
+[32m+[m[32m  //[m
+[32m+[m[32m  //   this was pulled from a raw pkt from a weather station   !3839.35N/12120.19W_232/002g006t072r000P000p000h51b10138.VWS-DavisVVue[m[41m   [m
+[32m+[m[32m  // This worked   String  packet[45] = "!3812.43N/12234.14W_000/000t086b10065L340F+030" ; at least on the th-d72a did not try to digi it[m
+[32m+[m[32m  //                  012345678901234567890123456789012345678901234567890123456789[m
+[32m+[m[32m  //                  0         1         2         3         4         5[m
+[32m+[m[32m  // This worked   char packet[68] = "!3812.43N/12234.14W_000/000t086L340b10065F+030" ;[m
+[32m+[m[32m  // Page 65 of aprs protocol version 1.0, t=056 deg F, Lumin=320, barom=1008.5, Flood=-3.5[m
+[32m+[m[32m  // Has Petaluma coords, need to overwrite data after the wind and gust[m
+[32m+[m[32m  //[m
+   char packet[] = {'!', '3','8','1','2','.','4','3','N','/','1','2','2','3','4','.','1','4','W','_','.','.','.','/','.','.','.','t','0','8','8','b','1','0','0','7','5','L','3','4','0','F','+','0','3','0'} ;  [m
+[31m-//                  0    1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   67890123456789[m
+[31m-//                  0                                        1                                       2                                       3                                       4                           5[m
+[32m+[m[32m  //                  0    1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   67890123456789[m
+[32m+[m[32m  //                  0                                        1                                       2                                       3                                       4                           5[m
+   packet[28] = PTMP[0] ;[m
+   packet[29] = PTMP[1] ;[m
+   packet[30] = PTMP[2] ;[m
+[36m@@ -224,22 +293,31 @@[m [mvoid loop() {[m
+   //Send packet to the TT3[m
+   //[m
+   // temporary comment out next five and the 30 second delay below to pause sending[m
+[31m-  digitalWrite(13, HIGH);[m
+[31m-  delay(10);[m
+[31m-  for (i=0;i<45;i++){    // Remember to increase this to packet size!   [m
+[32m+[m[32m  //[m
+[32m+[m[32m  // Flag it on or off for testing[m
+[32m+[m[32m  //[m
+[32m+[m[32m  if (flagRadioTransmit = 0) {[m
+[32m+[m[32m   digitalWrite(13, HIGH);[m
+[32m+[m[32m   delay(10);[m
+[32m+[m[32m   for (i=0;i<45;i++){    // Remember to increase this to packet size![m[41m   [m
+     Serial.print(packet[i]);[m
+        }[m
+[31m-  Serial.println("");[m
+[31m-  delay(2000);[m
+[31m-  digitalWrite(13, LOW);[m
+[31m-//  lcd.println("Just Sent Packet");[m
+[31m-  for (i=22;i<38;i++){    [m
+[32m+[m[32m   Serial.println("");[m
+[32m+[m[32m   delay(2000);[m
+[32m+[m[32m   digitalWrite(13, LOW);[m
+[32m+[m[32m   //  lcd.println("Just Sent Packet");[m
+[32m+[m[32m   for (i=22;i<38;i++){[m[41m    [m
+     lcd.print(packet[i]);[m
+[31m-       }[m
+[31m-  lcd.setCursor(0,1);[m
+[31m-  for (i=37;i<46;i++){     [m
+[32m+[m[32m    }[m
+[32m+[m[32m   lcd.setCursor(0,1);[m
+[32m+[m[32m   for (i=37;i<46;i++){[m[41m     [m
+     lcd.print(packet[i]);[m
+[31m-       }[m
+[31m-  delay(30000);[m
+[32m+[m[32m    }[m
+[32m+[m[32m   delay(30000);[m
+[32m+[m[32m    } else {[m
+[32m+[m[32m   lcd.println("RadioSendFlagOff");[m[41m   [m
+[32m+[m[32m    delay(2000);[m[41m  [m
+[32m+[m[32m }[m
+[32m+[m[41m [m
+ }[m
+ [m
+warning: LF will be replaced by CRLF in TideWeatherAPRS.ino.
+The file will have its original line endings in your working directory.
