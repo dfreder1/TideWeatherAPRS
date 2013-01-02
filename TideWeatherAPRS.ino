@@ -74,7 +74,7 @@ Arduino digital Pin 2 to Sensor pin rx
 // Temp and Barom
 #include <Wire.h>                       
 #include <Adafruit_BMP085.h>
-// Serial tools since using more than pins 0, 1
+// Serial tools since using more than pins 0, 1.  Use pin 10 to rx the gps
 #include <SoftwareSerial.h>
 SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so can I just leave it off the list?
 //
@@ -83,11 +83,13 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
  int k;
  int i;
  int j;
+ int n;
 //
  char linea[300] = "";  // for the GPS packet
  char lineGPS[300] = "";
  char GPSpacket[68] = ""; 
  char comandoGPR[7] = "$GPRMC";
+ char GPSholder = 65;
  int byteGPS=-1;
  int cont=0;
  int bien=0;
@@ -132,6 +134,9 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
  char lineb[5] = "";
  char templine[10] = "";
  int countb;
+ float datum=10.0;
+ float snr;    // Datum - sonar reading
+ float f;      // tide after subtracting the datum
  
 void setup(){
   //
@@ -144,8 +149,8 @@ void setup(){
   lcd.begin(16, 2);
   lcd.print("Hi Doug");  //so i know it is working
   // initialize the serial communications:
-  Serial.begin(9600);                                                         //  sonar at 9600  !!!!!!!!!!!!  bmp at 4800 !!! GPS at 4800!!!  ??????!
-  mySerial.begin(4800);                                                       // can I do different speeds?
+  Serial.begin(9600);                                                         
+  mySerial.begin(4800);                      // Surprised that you can do different speeds, cool.
   // initialize I2C with temp and barom
   bmp.begin();   
 }
@@ -162,171 +167,83 @@ void loop() {
   //
   byteGPS=-1;
   byteGPS=mySerial.read();        // Read a byte of the serial port                     
-  if (byteGPS == -1) {            // See if the port is empty yet
+  if (byteGPS == -1) {            // See if the port is empty and if so skip reading gps
      lcd.print("No Recd GPS");
-     delay(3000); 
+     delay(1000);                                                                     // will want a flag for this to turn it off outside of debugging
   } else {
      lcd.println("Recd GPS ");
-     delay(3000); 
-     linea[conta]=byteGPS;         // If there is serial port data, it is put in the buffer               STEP 1 WHY IS GPS SENDING GARBAGE?  THEN FIX ROUTINE TO GET DATA
-     conta++;                                                                                             // WONT WORK WILL TAKE TOO LONG FOR IT TO CYCLE THROUGH!!!
+     lcd.setCursor(0,1);
+    // itoa(byteGPS,GPSholder,2);
+    // lcd.print(byteGPS);
+     delay(1000); 
+//     linea[conta]=byteGPS;         // If there is serial port data, it is put in the buffer               
+//     conta++;                 
 //
-        for (i=1;i<300;i++){ 
-        lineGPS[i] = mySerial.read();   
- //       Serial.println(lineGPS[i]);
-        }  
-        for (i=1;i<16;i++){
-        lcd.print(lineGPS[i]);
-        }
-        delay(3000); 
-       if (byteGPS==13){            // If the received byte is = to 13, end of transmission 
-        cont=0;
-        bien=0;
-        pcount=0;
-        for (i=1;i<7;i++){     // Verifies if the received command starts with $GPR
-         if (linea[i]==comandoGPR[i-1]){
-           bien++;
+     for (i=1;i<300;i++){ 
+         byteGPS=mySerial.read();
+    //      lcd.print(byteGPS);
+    //      delay(100);    
+         lineGPS[i] = byteGPS;
+    //     lcd.print(lineGPS[i]);   
+     }  
+     for (i=1;i<250;i++){     
+       if (lineGPS[i]=='G'){
+         if (lineGPS[i+1]=='P') {
+           if (lineGPS[i+2]=='R') {
+             if (lineGPS[i+3]=='M') {
+               if (lineGPS[i+4]=='C') {
+//               get northing
+                 packet[1]=lineGPS[i+15];
+                 packet[2]=lineGPS[i+16];
+                 packet[3]=lineGPS[i+17];
+                 packet[4]=lineGPS[i+18];
+                 packet[5]=lineGPS[i+19];
+                 packet[6]=lineGPS[i+20];
+                 packet[7]=lineGPS[i+21];
+                 packet[8]=lineGPS[i+25];
+//               get easting 
+                 packet[10]=lineGPS[i+27];
+                 packet[11]=lineGPS[i+28];
+                 packet[12]=lineGPS[i+29];
+                 packet[13]=lineGPS[i+30];
+                 packet[14]=lineGPS[i+31];
+                 packet[15]=lineGPS[i+32];
+                 packet[16]=lineGPS[i+33];
+                 packet[17]=lineGPS[i+34];
+                 packet[18]=lineGPS[i+35];
+//               note not filling in ! or the slash and the underline on packet9 and packet19
+               }
+             }
+           }
          }
-        }
-        if(bien==6){               // If yes, continue and process the data
-             lcd.print("processing ");
-             delay(5000); 
-         for (i=0;i<300;i++){
-           if (linea[i]==','){    // check for the position of the  "," separator
-             indices[cont]=i;
-             cont++;
-           }
-           if (linea[i]=='*'){    // ... and the "*"
-             indices[12]=i;
-             cont++;
-           }
-           if (linea[i]=='.'){    // ... and the "."
-             periodLoc[pcount]=i;
-             pcount++;
-           }
-         }
-         // Assemble the gps packet data by parsing the raw stream from the GPS
-         // At the end, Send the packet to the lcd for checking and compile the packet array at the same time
-         // Will then pull only the gps data I need for the packet that will be ultimately sent with wx info
-         // For lcd screen, 0 column means first colum, 1 row means the second row
-       //
-         k=0;  // k will keep track of the start point to read in the chars to the packet array
-//       lcd.print(MSGFLAG); // from void set above
-         GPSpacket[k]=MSGFLAG;
-         j=indices[1]-indices[0];    // j should equal 7 so set it up to print 6 character for DMS
-         i=1;
-         while (i<j){ 
-//       lcd.print(linea[indices[0]+i]);
-          GPSpacket[k+i]=linea[indices[0]+i];
-          i++;
-         } 
-//       lcd.print(ZULU);
-         k=7;
-         GPSpacket[k]=ZULU;
-      // 
-         j=8;    // I know the Lat contained within the 7 characters from the indices2 comma
-         i=1;
-         while (i<j){
-//       lcd.print(linea[indices[2]+i]);
-          GPSpacket[k+i]=linea[indices[2]+i];
-          i++;
-         } 
-         k=15;
-//       lcd.print(linea[indices[3]+1]); // North, usually
-         GPSpacket[k]=(linea[indices[3]+1]);
-         //
-         k=16;
-//       lcd.print(SYMBOLTABLEID); //Symbol Table ID from void set above
-         GPSpacket[k]=SYMBOLTABLEID;
-         //       
-         j=9;    // I know the Longit is 8 characters past the indices4 comma
-         i=1;
-         while (i<j){
-//       lcd.print(linea[indices[4]+i]);
-          GPSpacket[k+i]=(linea[indices[4]+i]);
-          i++;
-         } 
-         k=25;
-//       lcd.print(linea[indices[5]+1]); // West, usually
-         GPSpacket[k]=linea[indices[5]+1];
-//       delay(1000);
-//       lcd.setCursor(0,0);
-//       lcd.clear();
-       //
-         k=26;
+       }
+     } 
+     //    k=26;
 //       lcd.print(SYMBOLCODE); //Symbol Code from void set above
-         GPSpacket[k]=SYMBOLCODE;
+     //    GPSpacket[k]=SYMBOLCODE;
          //
-         j=periodLoc[3]-indices[7];    // j-1 should equal the number of characters for Course that are left of the period which is a max of 3 say 243.2
-         if (j-1==1){
-          GPSpacket[27]='0';
-          GPSpacket[28]='0';
-          GPSpacket[29]=(linea[indices[7]+1]);
-         }
-         if (j-1==2){
-          GPSpacket[27]='0';
-          GPSpacket[28]=(linea[indices[7]+1]);
-          GPSpacket[29]=(linea[indices[7]+2]);
-         }
-         if (j-1==3){
-          GPSpacket[27]=(linea[indices[7]+1]);
-          GPSpacket[28]=(linea[indices[7]+2]);
-          GPSpacket[29]=(linea[indices[7]+3]);
-         }
-         GPSpacket[30]='/';
-         j=periodLoc[2]-indices[6];    // j-1 should equal the number of characters for Speed that are left of the period which is a max of 3 say 100.0
-         if (j-1==1){
-          GPSpacket[31]='0';
-          GPSpacket[32]='0';
-          GPSpacket[33]=(linea[indices[6]+1]);
-         }
-         if (j-1==2){
-          GPSpacket[31]='0';
-          GPSpacket[32]=(linea[indices[6]+1]);
-          GPSpacket[33]=(linea[indices[6]+2]);
-         }
-         if (j-1==3){
-          GPSpacket[31]=(linea[indices[6]+1]);
-          GPSpacket[32]=(linea[indices[6]+2]);
-          GPSpacket[33]=(linea[indices[6]+3]);
-         }
-         k=34;
-         GPSpacket[k]='\0';
-         if (MSGFLAG=='@') {
-//         lcd.print("Comment Here");
-          GPSpacket[k]='C';   // will have to work on this functionality and it'll need a null i think
-         }
-       // Get navigation receiver warning A or V   Would be good to get this earlier!
-         WARN = linea[indices[1]+1];
-//       
-//         if (WARN == 'A')  {
-//           for (i=0;i<34;i++){    // If comment to be included, this will have to have if statement to increase width              
-//           Serial.print(GPSpacket[i]);
-//           }
-//         Serial.println("");
 //         }
          delay(500);
          lcd.clear();
          for (i=8;i<24;i++){                  
-          lcd.print(GPSpacket[i]);
+          lcd.print(packet[i]);
           }
          lcd.setCursor(0,1);
          for (i=0;i<7;i++){                  
-          lcd.print(GPSpacket[i]);
+          lcd.print(packet[i]);
          }
-         lcd.print(" "); 
+         delay(1000);
+         lcd.clear();
          for (i=27;i<34;i++){                  
-          lcd.print(GPSpacket[i]);
+          lcd.print(packet[i]);
          }
-         delay(6000);   //  Need to have smart beacon here
+         delay(2000);   //  Need to have smart beacon here
          //  Yes! GPSPacket is complete!
-       }           
+      }           
        conta=0;                    // Reset the buffer
        for (i=0;i<300;i++){    //  
-         linea[i]=' ';             
+         lineGPS[i]=' ';             
        }                 
-     }
-   }
    lcd.clear(); 
 // 
 // Do the photocell *******************************************************************************************************************
@@ -423,19 +340,7 @@ void loop() {
     lineb[2]='b';
     lineb[3]='i';
     lineb[4]='t';
-//  byteGPS=Serial.read(); 
-//  lineb[0] = byteGPS;
-//    byteGPS=Serial.read(); 
-//  lineb[1] = byteGPS;
-//  byteGPS=Serial.read(); 
-//  lineb[2] = byteGPS;
-//  byteGPS=Serial.read(); 
-//  lineb[3] = byteGPS;
-//  byteGPS=Serial.read(); 
-//  lineb[4] = byteGPS;
-//
-// 
-//  for (j=1;j<11;j++) {
+//  
   byteSonar=-1;
   byteSonar=Serial.read();        // Read a byte of the serial port                        
   if (byteSonar==-1){
@@ -445,62 +350,35 @@ void loop() {
     lcd.println("got sonar");    
     delay(1000);
     lcd.clear();
-//    templine[0]=byteSonar;
-//    lcd.print(templine[0]);
     for (i=1;i<10;i++){    
       templine[i-1]=Serial.read();
       lcd.print(templine[i]);
     }
     lcd.setCursor(0,1);
     delay(2000);
-    lineb[0]=templine[3];
-    lineb[1]=templine[4];
-    lineb[2]=templine[5];
-    lineb[3]=templine[6];       
+    lineb[0]=templine[4];
+    lineb[1]=templine[5];
+    lineb[2]=templine[6];
+    lineb[3]='0';
+    lineb[4]='0';
+    lineb[5]='0';
     } 
     lcd.print("  ");
     lcd.print(lineb[0]);
     lcd.print(lineb[1]);
     lcd.print(lineb[2]);
     lcd.print(lineb[3]);
-   delay(2000);
-//  while (byteSonar != 'R') {
-//    byteSonar=Serial.read();
-//  }
-                                 // So byteGPS must be a R and so we are at the start of the "Rxyz_" sentence
-//      for (i=1;i<6;i++){        // i is 1 lineb0 becomes R, i is 2 lineb1 becomes x, i is 3 lineb2 y, i is 4 lineb3 z, i is 5 lineb 4 return character       
-//      lineb[i-1]=byteSonar;
-//      byteSonar=Serial.read();
-//      }
-//      byteSonar=Serial.read();   // Read next byte of the serial port
-//     i++;                      
-  // while (byteSonar == -1) {           // See if the port is empty and if so leave the sonar alone and move on to next thing
-//    delay(25);   
-//      lcd.println("no bytes");
-//  delay(500);   
-//    for (i=1;i<5;i++){          // if not empty, then you got something, so Read 10 bytes, which takes 10*49ms = 490ms
-//      lineb[i-1]=byteSonar;        // If there is serial port data, it is put in the buffer
-//      byteSonar=Serial.read();     // Read next byte of the serial port
-//     i++;                      
-      // if (byteSonar==13){            // If the received byte is = to 13, end of transmission
-      //  }
-//      } 
-//    }
-//  for (i=1;i<5;i++){ 
-//      lcd.print(lineb[i-1]);
-//      i++;                      
-//      }
-//    lcd.print(lineb[0]);
-//    lcd.print(lineb[1]);
-//    lcd.print(lineb[2]);
-//    lcd.print(lineb[3]);
-//    lcd.print(lineb[4]);
-//    lcd.println("*");
-//    delay(500);
+    lcd.print(lineb[4]);
+    lcd.print(lineb[5]);
+    delay(2000);
+//
+// Do the datum math
+//
+    // readstring.toCharArray(lineb, 5); //put readStringinto an array
+    snr = atof(lineb); //convert the array into a Float
+    f = datum - snr;
+//
     lcd.clear();
-//  }
-//  delay(1000);
-//  lcd.clear();
     digitalWrite(3, LOW);
   //
   // Assemble Packet  *******************************************************************************************************************
@@ -513,24 +391,40 @@ void loop() {
   // Page 65 of aprs protocol version 1.0, t=056 deg F, Lumin=320, barom=1008.5, Flood=-3.5
   // Has Petaluma coords, need to overwrite data after the wind and gust
   //
-  char packet[] = {'!', '3','8','1','2','.','4','3','N','/','1','2','2','3','4','.','1','4','W','_','.','.','.','/','.','.','.','t','0','8','8','b','1','0','0','7','5','L','3','4','0','F','+','0','3','0'} ;  
+//  char packet[] = {'!', '3','8','1','2','.','4','3','N','/','1','2','2','3','4','.','1','4','W','_','.','.','.','/','.','.','.','t','0','8','8','b','1','0','0','7','5','L','3','4','0','F','+','0','3','0'} ;  
   //                  0    1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   67890123456789
   //                  0                                        1                                       2                                       3                                       4                           5
+//       lcd.print(SYMBOLTABLEID); //Symbol Table ID from void set above  Need sim for the ! and the _
+  packet[0]='!';
+  packet[9]=SYMBOLTABLEID;
+  packet[19]='_';
+  packet[20]='.';
+  packet[21]='.';
+  packet[22]='.';
+  packet[23]='/';
+  packet[24]='.';
+  packet[25]='.';
+  packet[26]='.';
+  packet[27]='t';
   packet[28] = PTMP[0] ;
   packet[29] = PTMP[1] ;
   packet[30] = PTMP[2] ;
+  packet[31] = 'b' ;
   packet[32] = BAROM[0] ;
   packet[33] = BAROM[1] ;
   packet[34] = BAROM[2] ;  
   packet[35] = BAROM[3] ;
   packet[36] = BAROM[5] ;
+  packet[37] = 'L' ;
   packet[38] = PLUM[0] ;  
   packet[39] = PLUM[1] ;  
-  packet[40] = PLUM[2] ;  
+  packet[40] = PLUM[2] ;
+  packet[41] = 'F' ;
+  packet[42] = '+';
+  packet[43] = '+' ;
+  packet[44] = '+' ;
+  packet[45] = '+' ;
   //
-  //Send packet to the TT3  *******************************************************************************************************************
-  //
-  // temporary comment out next five and the 30 second delay below to pause sending
   //
   // Flag it on or off for testing
   //
