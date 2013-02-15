@@ -64,7 +64,7 @@ For the Sonar Distance Measuring, use Serial
 gnd to gnd
 5v to 5v
 Arduino Pin 0 (serial rx) to Sensor pin tx
-Arduino digital Pin 2 to Sensor pin rx 
+Arduino digital Pin 2 to Sensor pin rx                                       check it might be pin 3
  
  */
 
@@ -73,6 +73,9 @@ Arduino digital Pin 2 to Sensor pin rx
 #include <stdlib.h>
 // Temp and Barom
 #include <Wire.h>                       
+// Memory for the GPS readings so you can disconnect it after a minute or so
+#include <EEPROM.h>                       
+//
 #include <Adafruit_BMP085.h>
 // Serial tools since using more than pins 0, 1.  Use pin 10 to rx the gps
 #include <SoftwareSerial.h>
@@ -88,7 +91,7 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
  char linea[300] = "";  // for the GPS packet
  char lineGPS[300] = "";
  char GPSpacket[68] = ""; 
- char comandoGPR[7] = "$GPRMC";
+// char comandoGPR[7] = "$GPRMC";
  char GPSholder = 65;
  int byteGPS=-1;
  int cont=0;
@@ -140,26 +143,23 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
  
 void setup(){
   //
-  // set up the LCD's number of columns and rows:
-  pinMode(13, OUTPUT);   
-  pinMode(3, OUTPUT);   
-  // byteGPS=-1;
-  // byteSonar=-1;
+  pinMode(13, OUTPUT);  // radio enable   
+  pinMode(3, OUTPUT);   // sonar enable
   //
   lcd.begin(16, 2);
   lcd.print("Hi Doug");  //so i know it is working
   // initialize the serial communications:
-  Serial.begin(9600);                                                         
-  mySerial.begin(4800);                      // Surprised that you can do different speeds, cool.
+  Serial.begin(9600);                        // read from sonar into pin 0, transmit from pin 1 to tinypack                                 
+  mySerial.begin(4800);                      // gps Surprised that you can do different speeds, cool.
   // initialize I2C with temp and barom
   bmp.begin();   
 }
 
 void loop() {
-  flagRadioTransmit = 1;    // 0 off, 1 on
+  flagRadioTransmit = 1;    // 0 is radio tx off, 1 is tx on
   //
-  digitalWrite(13, LOW);
-  digitalWrite(3, LOW);
+  digitalWrite(13, LOW);  // 13 high triggers radio transmit
+  digitalWrite(3, LOW);   // 3 high triggers sonar 
   lcd.clear();
   delay(30);
   //
@@ -169,81 +169,91 @@ void loop() {
   byteGPS=mySerial.read();        // Read a byte of the serial port                     
   if (byteGPS == -1) {            // See if the port is empty and if so skip reading gps
      lcd.print("No Recd GPS");
-     delay(1000);                                                                     // will want a flag for this to turn it off outside of debugging
+     delay(1000);                                                    
   } else {
      lcd.println("Recd GPS ");
      lcd.setCursor(0,1);
-    // itoa(byteGPS,GPSholder,2);
-    // lcd.print(byteGPS);
-     delay(1000); 
+     delay(500); 
 //     linea[conta]=byteGPS;         // If there is serial port data, it is put in the buffer               
 //     conta++;                 
 //
-     for (i=1;i<300;i++){ 
-         byteGPS=mySerial.read();
-    //      lcd.print(byteGPS);
-    //      delay(100);    
-         lineGPS[i] = byteGPS;
-    //     lcd.print(lineGPS[i]);   
-     }  
-     for (i=1;i<250;i++){     
+     for (i=1;i<100;i++){ 
+         lineGPS[i]=mySerial.read();
+     }    
+    //    
+    //  example  $GPRMC,081836,A,3751.6115,S,14507.3226,E,000.0,then other stuff im not using
+    //           12345678901234567890123456789012345678901234567890123456789012334567890
+    //           0        1         2         3         4         5         6
+    //           This is South latitude 37d51.6115m, East longitude 145d07.3226m    
+    //  
+     for (i=0;i<50;i++){     
        if (lineGPS[i]=='G'){
          if (lineGPS[i+1]=='P') {
            if (lineGPS[i+2]=='R') {
              if (lineGPS[i+3]=='M') {
                if (lineGPS[i+4]=='C') {
+//               if we got here, then we have the gprmc sentence starting at i and for some reason i is usu but not always 1
+//               doesnt matter what i is  
 //               get northing
-                 packet[1]=lineGPS[i+15];
+                 packet[1]=lineGPS[i+15];   // first digit of the Northing so prob a 3
                  packet[2]=lineGPS[i+16];
-                 packet[3]=lineGPS[i+17];
+                 packet[3]=lineGPS[i+17];   
                  packet[4]=lineGPS[i+18];
-                 packet[5]=lineGPS[i+19];
+                 packet[5]=lineGPS[i+19];  // should be a period
                  packet[6]=lineGPS[i+20];
                  packet[7]=lineGPS[i+21];
-                 packet[8]=lineGPS[i+25];
+//                 packet[8]=lineGPS[i+22];  can't packet these digits to aprs
+//                 packet[9]=lineGPS[i+23];
+                 packet[8]=lineGPS[i+25]; // this will be N or S
 //               get easting 
-                 packet[10]=lineGPS[i+27];
+                 packet[10]=lineGPS[i+27];  // should be first digit of Easting
                  packet[11]=lineGPS[i+28];
                  packet[12]=lineGPS[i+29];
                  packet[13]=lineGPS[i+30];
                  packet[14]=lineGPS[i+31];
-                 packet[15]=lineGPS[i+32];
+                 packet[15]=lineGPS[i+32];   // should be a period
                  packet[16]=lineGPS[i+33];
                  packet[17]=lineGPS[i+34];
-                 packet[18]=lineGPS[i+35];
-//               note not filling in ! or the slash and the underline on packet9 and packet19
+//                 packet[20]=lineGPS[i+35];  can't packet these digits to aprs
+//                 packet[21]=lineGPS[i+36];
+                 packet[18]=lineGPS[i+38];  // will be E or W
+//               note not filling in ! or the slash and the underline on packet9 and packet19 will do that below
+                // 
+                // If these are new then store in memory, pick an offset of 100 for mem location burn cycles protection
+                //
+                  for (j=1;j<19;j++){   
+                    if (packet[j]==int(EEPROM.read(100+j))) {                      
+                      Serial.print(j);
+                      Serial.println(" Old val same as new, so not stored ");
+                    } else {
+                      EEPROM.write(100+j,packet[j]);
+                      Serial.print(j);
+                      Serial.println(" New val diff than old, so is stored ");
+                    }
+                      //Serial.print(int(lineGPS[j]));
+                      //Serial.println(" same? ");
+                  }                    
                }
              }
            }
          }
        }
      } 
-     //    k=26;
-//       lcd.print(SYMBOLCODE); //Symbol Code from void set above
-     //    GPSpacket[k]=SYMBOLCODE;
-         //
-//         }
+    }           
+       for (i=0;i<300;i++){    //  Reset the buffer
+         lineGPS[i]=' ';             
+       }    
+//  print to lcd what it thinks the lat lon is, note that it really uses the eeprom not the packet at this point so this could actually read bad values 
          delay(500);
          lcd.clear();
-         for (i=8;i<24;i++){                  
+         for (i=1;i<8;i++){                  
           lcd.print(packet[i]);
-          }
+         }
          lcd.setCursor(0,1);
-         for (i=0;i<7;i++){                  
+         for (i=10;i<18;i++){                  
           lcd.print(packet[i]);
          }
-         delay(1000);
-         lcd.clear();
-         for (i=27;i<34;i++){                  
-          lcd.print(packet[i]);
-         }
-         delay(2000);   //  Need to have smart beacon here
-         //  Yes! GPSPacket is complete!
-      }           
-       conta=0;                    // Reset the buffer
-       for (i=0;i<300;i++){    //  
-         lineGPS[i]=' ';             
-       }                 
+         delay(1000); 
    lcd.clear(); 
 // 
 // Do the photocell *******************************************************************************************************************
@@ -356,10 +366,10 @@ void loop() {
     }
     lcd.setCursor(0,1);
     delay(2000);
-    lineb[0]=templine[4];
+    lineb[0]=templine[4];  // just used trial and error to get the first digit
     lineb[1]=templine[5];
     lineb[2]=templine[6];
-    lineb[3]='0';
+    lineb[3]='0';          //prob should just comment this out now
     lineb[4]='0';
     lineb[5]='0';
     } 
@@ -367,16 +377,15 @@ void loop() {
     lcd.print(lineb[0]);
     lcd.print(lineb[1]);
     lcd.print(lineb[2]);
-    lcd.print(lineb[3]);
+    lcd.print(lineb[3]);    // comment these out
     lcd.print(lineb[4]);
     lcd.print(lineb[5]);
     delay(2000);
 //
-// Do the datum math
+// Do the datum math - will use this later once datum is established
 //
-    // readstring.toCharArray(lineb, 5); //put readStringinto an array
-    snr = atof(lineb); //convert the array into a Float
-    f = datum - snr;
+//    snr = atof(lineb); //convert the array into a Float
+//    f = datum - snr;
 //
     lcd.clear();
     digitalWrite(3, LOW);
@@ -396,6 +405,10 @@ void loop() {
   //                  0                                        1                                       2                                       3                                       4                           5
 //       lcd.print(SYMBOLTABLEID); //Symbol Table ID from void set above  Need sim for the ! and the _
   packet[0]='!';
+    for (i=1;i<19;i++){    
+      packet[i]=EEPROM.read(100+i);
+    }
+  // packet 1-18  are as pulled in from the gps above
   packet[9]=SYMBOLTABLEID;
   packet[19]='_';
   packet[20]='.';
@@ -420,33 +433,33 @@ void loop() {
   packet[39] = PLUM[1] ;  
   packet[40] = PLUM[2] ;
   packet[41] = 'F' ;
-  packet[42] = '+';
-  packet[43] = '+' ;
-  packet[44] = '+' ;
-  packet[45] = '+' ;
+  packet[42] = '+';   // need to learn if or how this works
+  packet[43] = lineb[0]; // '+' ;
+  packet[44] = lineb[1]; // '+' ;
+  packet[45] = lineb[2]; // '+' ;
   //
   //
-  // Flag it on or off for testing
+  // Flag radio transmit on or off for testing
   //
-  if (flagRadioTransmit = 0) {
+ if (flagRadioTransmit = 1) {
     digitalWrite(13, HIGH);
     delay(10);
-    for (i=0;i<45;i++){    // Remember to increase this to packet size!   
+    for (i=0;i<46;i++){    // Remember to increase this to packet size!   
       Serial.print(packet[i]);
     }
     Serial.println("");
-    delay(2000);
+    delay(1000);
     digitalWrite(13, LOW);
-     //  lcd.println("Just Sent Packet");
-    for (i=22;i<38;i++){    
-      lcd.print(packet[i]);
-    }
-    lcd.setCursor(0,1);
-    for (i=37;i<46;i++){     
-      lcd.print(packet[i]);
-      }
+    lcd.println("Just Sent Packet");
+    // for (i=22;i<38;i++){    
+    //    lcd.print(packet[i]);
+    // }
+    // lcd.setCursor(0,1);
+    // for (i=37;i<46;i++){     
+    //  lcd.print(packet[i]);
+    //  }
     delay(30000);
-    } else {
+  } else {
     lcd.println("RadioSendFlagOff");   
     delay(2000);  
     }
