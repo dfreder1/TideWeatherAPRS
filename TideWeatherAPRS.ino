@@ -90,7 +90,7 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
 //
  char linea[300] = "";  // for the GPS packet
  char lineGPS[300] = "";
- char GPSpacket[68] = ""; 
+ char testpacket[68] = ""; 
 // char comandoGPR[7] = "$GPRMC";
  char GPSholder = 65;
  int byteGPS=-1;
@@ -115,7 +115,7 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
 // 
  char PLUM[3];       // for assembling the packet of 3 integers from LUM
 // 
- char packet[45];    // This is the ultimate packet sent to the TNC
+ char packet[46];    // This is the ultimate packet sent to the TNC
  // flags
  int flagRadioTransmit;
 // 
@@ -396,7 +396,7 @@ void loop() {
   // This worked   String  packet[45] = "!3812.43N/12234.14W_000/000t086b10065L340F+030" ; at least on the th-d72a did not try to digi it
   //                  012345678901234567890123456789012345678901234567890123456789
   //                  0         1         2         3         4         5
-  // This worked   char packet[68] = "!3812.43N/12234.14W_000/000t086L340b10065F+030" ;
+  // This worked   char Testpacket[68] = "!3812.43N/12234.14W_000/000t086L340b10065F+030" ;
   // Page 65 of aprs protocol version 1.0, t=056 deg F, Lumin=320, barom=1008.5, Flood=-3.5
   // Has Petaluma coords, need to overwrite data after the wind and gust
   //
@@ -436,6 +436,7 @@ void loop() {
   packet[42] = '+';   // need to learn if or how this works
   packet[43] = lineb[0]; // '+' ;
   packet[44] = lineb[1]; // '+' ;
+  //        need to fix
   packet[45] = lineb[2]; // '+' ;
   //
   //
@@ -443,12 +444,16 @@ void loop() {
   //
  if (flagRadioTransmit = 1) {
     digitalWrite(13, HIGH);
-    delay(10);
-    for (i=0;i<46;i++){    // Remember to increase this to packet size!   
+    delay(100);
+    //
+    // test packet known to work into the tinypack
+    // char testpacket[68] = "!3812.43N/12234.14W_000/000t086L340b10065F+030" ;  // 46 chars
+    //
+    for (i=0;i<46;i++){    // Remember to change this to packet size and to not use testpacket!   
       Serial.print(packet[i]);
     }
     Serial.println("");
-    delay(1000);
+    delay(2500);
     digitalWrite(13, LOW);
     lcd.println("Just Sent Packet");
     // for (i=22;i<38;i++){    
@@ -458,7 +463,7 @@ void loop() {
     // for (i=37;i<46;i++){     
     //  lcd.print(packet[i]);
     //  }
-    delay(30000);
+    delay(300000);
   } else {
     lcd.println("RadioSendFlagOff");   
     delay(2000);  
