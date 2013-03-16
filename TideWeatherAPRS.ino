@@ -62,9 +62,9 @@ XCLR is a reset pin, also not used here
 
 For the Sonar Distance Measuring, use Serial
 gnd to gnd
-5v to 5v
+5v to 5v  NOT using this as instead using digital pin 2 to power the sonar
 Arduino Pin 0 (serial rx) to Sensor pin tx
-Arduino digital Pin 2 to Sensor pin rx                                       check it might be pin 3
+Arduino digital Pin 3 to Sensor +5v power                                       
  
  */
 
@@ -134,8 +134,8 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
  // Items needed for sonar
  //
  int byteSonar=-1;
- char lineb[5] = "";
- char templine[10] = "";
+ char lineb[3] = "";
+ char templine[100] = "";
  int countb;
  float datum=10.0;
  float snr;    // Datum - sonar reading
@@ -343,43 +343,46 @@ void loop() {
   //
   // Do the sonar distance measuring  *******************************************************************************************************************
   //
-  digitalWrite(3, HIGH);
-  delay(200); 
+  digitalWrite(3, HIGH);   // seems to be that I have to cycle through it twice
+  delay(1000);
+     for (i=0;i<99;i++){    
+     templine[i]=Serial.read();
+     // lcd.print(templine[i]);
+     } 
+  delay(1000); 
     lineb[0]='n';
     lineb[1]='o';
     lineb[2]='b';
-    lineb[3]='i';
-    lineb[4]='t';
 //  
   byteSonar=-1;
   byteSonar=Serial.read();        // Read a byte of the serial port                        
   if (byteSonar==-1){
     lcd.println("no sonar");
-    delay(1000);
+    delay(500);
   } else {
     lcd.println("got sonar");    
     delay(1000);
     lcd.clear();
-    for (i=1;i<10;i++){    
-      templine[i-1]=Serial.read();
-      lcd.print(templine[i]);
+    for (i=0;i<99;i++){    
+      templine[i]=Serial.read();
+     // lcd.print(templine[i]);
     }
+        for (i=0;i<99;i++){    // Remember to change this to packet size and to not use testpacket!   
+        Serial.print(templine[i]);
+        }
+        Serial.println("");
+        delay(1000);
     lcd.setCursor(0,1);
-    delay(2000);
-    lineb[0]=templine[4];  // just used trial and error to get the first digit
-    lineb[1]=templine[5];
-    lineb[2]=templine[6];
-    lineb[3]='0';          //prob should just comment this out now
-    lineb[4]='0';
-    lineb[5]='0';
+    delay(500);
+    lineb[0]=templine[50];  // just used trial and error to get the last readout in templine which is the most recent
+    lineb[1]=templine[51];
+    lineb[2]=templine[52];
     } 
+    digitalWrite(3, LOW);
     lcd.print("  ");
     lcd.print(lineb[0]);
     lcd.print(lineb[1]);
     lcd.print(lineb[2]);
-    lcd.print(lineb[3]);    // comment these out
-    lcd.print(lineb[4]);
-    lcd.print(lineb[5]);
     delay(2000);
 //
 // Do the datum math - will use this later once datum is established
@@ -388,9 +391,8 @@ void loop() {
 //    f = datum - snr;
 //
     lcd.clear();
-    digitalWrite(3, LOW);
   //
-  // Assemble Packet  *******************************************************************************************************************
+  // Assemble Weather Packet  *******************************************************************************************************************
   //
   //   this was pulled from a raw pkt from a weather station   !3839.35N/12120.19W_232/002g006t072r000P000p000h51b10138.VWS-DavisVVue   
   // This worked   String  packet[45] = "!3812.43N/12234.14W_000/000t086b10065L340F+030" ; at least on the th-d72a did not try to digi it
@@ -432,13 +434,21 @@ void loop() {
   packet[38] = PLUM[0] ;  
   packet[39] = PLUM[1] ;  
   packet[40] = PLUM[2] ;
-  packet[41] = 'F' ;
-  packet[42] = '+';   // need to learn if or how this works
-  packet[43] = lineb[0]; // '+' ;
-  packet[44] = lineb[1]; // '+' ;
-  //        need to fix
-  packet[45] = lineb[2]; // '+' ;
+  packet[41] = 'w' ;
+  packet[42] = 'R';   // need to learn if or how this works
+  packet[43] = 'R' ;
+  packet[44] = 'R' ;
   //
+  //
+  // Assemble Telemetry Water Level Packet  *******************************************************************************************************************
+  //
+//  char packet[] = {'!', '3','8','1','2','.','4','3','N','/','1','2','2','3','4','.','1','4','W','_','.','.','.','/','.','.','.','t','0','8','8','b','1','0','0','7','5','L','3','4','0','F','+','0','3','0'} ;  
+  //                  0    1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   67890123456789
+  //                  0                                        1                                       2                                       3                                       4                           5
+
+    
+    
+
   //
   // Flag radio transmit on or off for testing
   //
@@ -446,24 +456,14 @@ void loop() {
     digitalWrite(13, HIGH);
     delay(100);
     //
-    // test packet known to work into the tinypack
-    // char testpacket[68] = "!3812.43N/12234.14W_000/000t086L340b10065F+030" ;  // 46 chars
-    //
     for (i=0;i<46;i++){    // Remember to change this to packet size and to not use testpacket!   
       Serial.print(packet[i]);
     }
     Serial.println("");
-    delay(2500);
+    delay(100);
     digitalWrite(13, LOW);
     lcd.println("Just Sent Packet");
-    // for (i=22;i<38;i++){    
-    //    lcd.print(packet[i]);
-    // }
-    // lcd.setCursor(0,1);
-    // for (i=37;i<46;i++){     
-    //  lcd.print(packet[i]);
-    //  }
-    delay(300000);
+    delay(10000);                   // make this 300000 for 5 min intervals
   } else {
     lcd.println("RadioSendFlagOff");   
     delay(2000);  
