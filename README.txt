@@ -1,4 +1,6 @@
-TideWeatherAPRS
+TideWeatherAPRS 
+
+3/16/2013
 
 Arduino code for a portable tide and weather monitoring APRS station.  
 
@@ -16,6 +18,9 @@ Power to the arduino is by a x watt solar panel feeding a x amp hour dry cell.
 Tasks are to:
 
 Re-write cleaner code with calls
-Provide code so the gps can be physically detached/removed after a few cycles 
+Provide code so the gps can be physically detached/removed after a few cycles
+Lots of testing to do
+Make the hardware container 
+
 
 
