@@ -182,7 +182,7 @@ void loop() {
     //           12345678901234567890123456789012345678901234567890123456789012334567890
     //           0        1         2         3         4         5         6
     //           This is South latitude 37d51.6115m, East longitude 145d07.3226m    
-    //  
+    //           You can delete this line, just added to test git 
      for (i=0;i<50;i++){     
        if (lineGPS[i]=='G'){
          if (lineGPS[i+1]=='P') {
