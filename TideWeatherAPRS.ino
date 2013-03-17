@@ -1,18 +1,15 @@
 /*
 TideWeatherStation
-
- 16x2 LCD display.  The LiquidCrystal
+   
+See APRS101 doc for APRS msg details, such as the 
+top of page 95 for Lat Long position report format with data ext and timestamp
+ 
+LCD:
+ For debugging only, use a 16x2 LCD display.  The LiquidCrystal
  library works with all LCD displays that are compatible with the 
  Hitachi HD44780 driver. There are many of them out there, and you
  can usually tell them by the 16-pin interface.
- 
- This sketch displays text sent over the serial port 
- (e.g. from the Serial Monitor) or rx on pin 0 on an attached LCD.
- 
- Need to read the luminosity and the barometer
- 
-See APRS101 doc top of page 95 for Lat Long position report format with data ext ad timestamp
- 
+
  The circuit:
  * LCD RS pin (pin 4 on the lcd) to digital pin 8  
  * LCD Enable pin (pin 6 on the lcd) to digital pin 9 
@@ -25,7 +22,7 @@ See APRS101 doc top of page 95 for Lat Long position report format with data ext
  * ends to +5V and ground
  * wiper to LCD VO pin (pin 3) 
  
- Library originally added 18 Apr 2008
+ LCD Library originally added 18 Apr 2008
  by David A. Mellis
  library modified 5 Jul 2009
  by Limor Fried (http://www.ladyada.net)
@@ -35,8 +32,7 @@ See APRS101 doc top of page 95 for Lat Long position report format with data ext
  by Tom Igoe
  modified Doug Fredericks Feb 2012
  
- For Barometer
- 
+For Barometer:
  *************************************************** 
   This is an example for the BMP085 Barometric Pressure & Temp Sensor
 
@@ -53,35 +49,36 @@ See APRS101 doc top of page 95 for Lat Long position report format with data ext
   BSD license, all text above must be included in any redistribution
  ****************************************************
 
-Connect VCC of the BMP085 sensor to 3.3V (NOT 5.0V!)
-Connect GND to Ground
-Connect SCL to i2c clock - on '168/'328 Arduino Uno/Duemilanove/etc thats Analog 5
-Connect SDA to i2c data - on '168/'328 Arduino Uno/Duemilanove/etc thats Analog 4
-EOC is not used, it signifies an end of conversion
-XCLR is a reset pin, also not used here
+ Connect VCC of the BMP085 sensor to 3.3V (NOT 5.0V!)
+ Connect GND to Ground
+ Connect SCL to i2c clock - on '168/'328 Arduino Uno/Duemilanove/etc thats Analog 5
+ Connect SDA to i2c data - on '168/'328 Arduino Uno/Duemilanove/etc thats Analog 4
+ EOC is not used, it signifies an end of conversion
+ XCLR is a reset pin, also not used here
 
-For the Sonar Distance Measuring, use Serial
-gnd to gnd
-5v to 5v  NOT using this as instead using digital pin 2 to power the sonar
-Arduino Pin 0 (serial rx) to Sensor pin tx
-Arduino digital Pin 3 to Sensor +5v power                                       
+Sonar:
+ For the Sonar Distance Measuring, use Serial
+ gnd to gnd
+ 5v to 5v  NOT using this as instead using digital pin 2 to power the sonar
+ Arduino Pin 0 (serial rx) to Sensor pin tx
+ Arduino digital Pin 3 to Sensor +5v power                                       
  
- */
+*/
 
-// include the library code for Display:
+// include the library code for LCD Display:
 #include <LiquidCrystal.h>
 #include <stdlib.h>
-// Temp and Barom
+// Temp and Barom    Wait is this really necessary?
 #include <Wire.h>                       
-// Memory for the GPS readings so you can disconnect it after a minute or so
+// Memory for the GPS readings so you can disconnect the GPS after a minute or so
 #include <EEPROM.h>                       
-//
+// For the temperature and barometer
 #include <Adafruit_BMP085.h>
 // Serial tools since using more than pins 0, 1.  Use pin 10 to rx the gps
 #include <SoftwareSerial.h>
 SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so can I just leave it off the list?
 //
-// initialize the library with the numbers of the interface pins, same order as description above
+// For LCD initialize the library with the numbers of the interface pins, same order as description above
  LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
  int k;
  int i;
