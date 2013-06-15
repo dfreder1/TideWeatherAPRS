@@ -1,6 +1,6 @@
 TideWeatherAPRS 
 
-3/16/2013
+6/14/2013
 
 Arduino code for a portable tide and weather monitoring APRS station.  
 
@@ -22,5 +22,8 @@ Provide code so the gps can be physically detached/removed after a few cycles
 Lots of testing to do
 Make the hardware container 
 
+Operation:
+Turn on the separate gps, wait for a signal, plug in to the serial port, and wait a few minutes for the NMEA sentence to get parsed and put into EPROM memory on the arduino.  You can now unplug the gps.
 
+ 
 
