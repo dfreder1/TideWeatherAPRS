@@ -83,11 +83,11 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
  int k;
  int i;
  int j;
- int n;
+ int n=0;   // used to count the number of times looped thru and set the serial number on telemetry packet
 //
  char linea[300] = "";  // for the GPS packet
  char lineGPS[300] = "";
- char testpacket[68] = ""; 
+// char testpacket[68] = ""; 
 // char comandoGPR[7] = "$GPRMC";
  char GPSholder = 65;
  int byteGPS=-1;
@@ -108,11 +108,15 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
  char PTMP[3];        // for assembling the packet of 3 integers from TMP
  char BAROM[10];
  char TID[10];
+ //
  char LUM[4];
-// 
  char PLUM[3];       // for assembling the packet of 3 integers from LUM
+ //
+ char NNN[4];
+ char SER[3];       // for assembling the packet of 3 integers from n
 // 
- char packet[46];    // This is the ultimate packet sent to the TNC
+ char packet[46];    // This is the ultimate packet sent to the TNC for the location and weather
+ char telempkt[8];   // This is the telemetry packet with sonar (water height) data
  // flags
  int flagRadioTransmit;
 // 
@@ -154,6 +158,7 @@ void setup(){
 
 void loop() {
   flagRadioTransmit = 1;    // 0 is radio tx off, 1 is tx on
+  n = n+1; // start the counter
   //
   digitalWrite(13, LOW);  // 13 high triggers radio transmit
   digitalWrite(3, LOW);   // 3 high triggers sonar 
@@ -382,10 +387,6 @@ void loop() {
     lcd.print(lineb[2]);
     delay(2000);
 //
-// Do the datum math - will use this later once datum is established
-//
-//    snr = atof(lineb); //convert the array into a Float
-//    f = datum - snr;
 //
     lcd.clear();
   //
@@ -398,6 +399,7 @@ void loop() {
   // This worked   char Testpacket[68] = "!3812.43N/12234.14W_000/000t086L340b10065F+030" ;
   // Page 65 of aprs protocol version 1.0, t=056 deg F, Lumin=320, barom=1008.5, Flood=-3.5
   // Has Petaluma coords, need to overwrite data after the wind and gust
+  // Can't get Flood to work on aprs.fi anyway, will use telemetry
   //
 //  char packet[] = {'!', '3','8','1','2','.','4','3','N','/','1','2','2','3','4','.','1','4','W','_','.','.','.','/','.','.','.','t','0','8','8','b','1','0','0','7','5','L','3','4','0','F','+','0','3','0'} ;  
   //                  0    1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   67890123456789
@@ -436,20 +438,69 @@ void loop() {
   packet[43] = 'R' ;
   packet[44] = 'R' ;
   //
-  //
   // Assemble Telemetry Water Level Packet  *******************************************************************************************************************
   //
-//  char packet[] = {'!', '3','8','1','2','.','4','3','N','/','1','2','2','3','4','.','1','4','W','_','.','.','.','/','.','.','.','t','0','8','8','b','1','0','0','7','5','L','3','4','0','F','+','0','3','0'} ;  
-  //                  0    1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   67890123456789
-  //                  0                                        1                                       2                                       3                                       4                           5
-
-    
-    
-
+  // Will send a T packet "T#sss,111" where sss is a serial number and a 111 is 
+  // convert n which will be 1 to 999 to a serial number, there must be a better way to do this
+    if (n > 99) {
+     String NNN = String(n);
+     SER[0] = NNN[0];
+     SER[1] = NNN[1];
+     SER[2] = NNN[2];
+     }
+    else if (n < 10)
+     {
+     String NNN = String(n);
+     SER[0] = '0';
+     SER[1] = '0';
+     SER[2] = NNN[0];
+     }
+     else
+     {
+     String NNN = String(n);
+     SER[0] = '0';
+     SER[1] = NNN[0];
+     SER[2] = NNN[1];
+     }
+//
+  telempkt[0]='T' ;
+  telempkt[1]='#' ;
+  telempkt[2]=SER[0] ;
+  telempkt[3]=SER[1] ;
+  telempkt[4]=SER[2] ;
+  telempkt[5]=',' ;
+  telempkt[6]=lineb[0] ; 
+  telempkt[7]=lineb[1] ;
+  telempkt[8]=lineb[2] ;
   //
-  // Flag radio transmit on or off for testing
+  // Radio transmit the packets
+  // We want Telemetry tide data every 6 mins, and weather every, say, 5th time or 30 minutes
+  // Will just use delay function to get every 6 mins
+  // Use mod function to get weather sent. ...993%5=3, 994%5=4,995%5=0, send if 0  
   //
- if (flagRadioTransmit = 1) {
+  // Send telemetry pkt every 6 mins
+  //
+ delay(330000); // 330,000 ms is 330 sec or 5.5 min 
+ if (flagRadioTransmit == 1 && n%1 == 0) {
+    digitalWrite(13, HIGH);
+    delay(100);
+    //
+    for (i=0;i<8;i++){       
+      Serial.print(telempkt[i]);
+    }
+    Serial.println("");
+    delay(100);
+    digitalWrite(13, LOW);
+    lcd.println("Sent Telem Pkt");
+    delay(2000);                  
+  } else {
+    lcd.println("No send Telem Pkt");   
+    delay(2000);  
+    }
+   //
+   // Send Wx packet every 5th time
+   //
+    if (flagRadioTransmit == 1 && n%5 == 0) {
     digitalWrite(13, HIGH);
     delay(100);
     //
@@ -459,12 +510,15 @@ void loop() {
     Serial.println("");
     delay(100);
     digitalWrite(13, LOW);
-    lcd.println("Just Sent Packet");
-    delay(10000);                   // make this 300000 for 5 min intervals
+    lcd.println("Sent Wx Pkt");
+    delay(2000);                   
   } else {
-    lcd.println("RadioSendFlagOff");   
+    lcd.println("No send Wx Pkt");   
     delay(2000);  
     }
+  if (n>=999){
+    n=0;
+  } 
  }
 
 
