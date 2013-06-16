@@ -83,7 +83,10 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
  int k;
  int i;
  int j;
+ int z;
  int n=0;   // used to count the number of times looped thru and set the serial number on telemetry packet
+ int tt1=1;   // used to get the fake tide for tweeting
+ int tt2=1;
 //
  char linea[300] = "";  // for the GPS packet
  char lineGPS[300] = "";
@@ -114,11 +117,13 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
  //
  char NNN[4];
  char SER[3];       // for assembling the packet of 3 integers from n
+ char TTT[3];       // for tweeting a "tide"
 // 
  char packet[46];    // This is the ultimate packet sent to the TNC for the location and weather
  char telempkt[8];   // This is the telemetry packet with sonar (water height) data
+ char tweetpkt[27];
  // flags
- int flagRadioTransmit;
+ int flagRadioTransmit=1;
 // 
 //
 // Items needed for barometer and temperature
@@ -138,9 +143,9 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
  char lineb[3] = "";
  char templine[100] = "";
  int countb;
- float datum=10.0;
- float snr;    // Datum - sonar reading
- float f;      // tide after subtracting the datum
+ float datum=10.0;  // not using this
+ float snr;    // not using this     Datum - sonar reading
+ float f;      // not using this     tide after subtracting the datum
  
 void setup(){
   //
@@ -260,14 +265,11 @@ void loop() {
 // 
 // Do the photocell *******************************************************************************************************************
 //
-  photocellReading = analogRead(photocellPin);  // reads an integer off the pin that could be 1, 2 or 3 digits
+  photocellReading = analogRead(photocellPin);  // reads an integer off the pin that could be up to 1023
+  photocellReading = map(photocellReading, 0, 1023, 0, 255); // aprs telemetry can only take up to 255
   if (photocellReading > 99) 
      {
      String LUM = String(photocellReading);
-//     lcd.print("Lumino>99 ");
-//     lcd.print(LUM);
-//     lcd.print(" ");
-//     lcd.print(LUM[2]);
      PLUM[0] = LUM[0];
      PLUM[1] = LUM[1];
      PLUM[2] = LUM[2];
@@ -287,12 +289,15 @@ void loop() {
      PLUM[2] = LUM[1];
      }
   lcd.print("Lumino= ");
+  lcd.print(photocellReading);
+//  lcd.print(analogRead(photocellPin));
+  lcd.setCursor(0,1);
   lcd.print(PLUM[0]);
   lcd.print(PLUM[1]); 
   lcd.print(PLUM[2]);
   //    lcd.print(" S");  
-  lcd.setCursor(0,1);
-  lcd.print(photocellReading);
+  // lcd.setCursor(0,1);
+  // lcd.print(photocellReading);
   //
   delay(1000);
   lcd.clear(); 
@@ -382,7 +387,7 @@ void loop() {
     } 
     digitalWrite(3, LOW);
     lcd.print("  ");
-    lcd.print(lineb[0]);
+    lcd.print(lineb[0]);  // distance from sonar to water in inches - 028 is 28"
     lcd.print(lineb[1]);
     lcd.print(lineb[2]);
     delay(2000);
@@ -473,14 +478,85 @@ void loop() {
   telempkt[7]=lineb[1] ;
   telempkt[8]=lineb[2] ;
   //
+  // Assemble Tweet to 73S  *******************************************************************************************************************
+  //
+  // Say "Tide=43, Temp=56"  read '43' as 4.3'  temp in degrees F
+  // "via APRS" is tacked on by 73S
+  //
+  // convert string lineb (dist from sonar to water) into a 'tide' of sorts.  Assume sonar
+  // height is at a Tide = 10.0'
+  //
+  tt1 = atoi(lineb)/1000;  // no idea why the /1000  is needed, convert string to integer, say '028' to 28
+  tt2 = ((120-tt1)*10/12);  // reuse tt, (120-28)/12  x 10 is 76.666, and since integer just 77
+                            // and you'll read it as tide is 7.7'  
+  String(tt2).toCharArray(TTT, 3);                          
+     if (tt2 < 10)
+      {
+      TTT[2] = TTT[0];
+      TTT[0] = '0';
+      TTT[1] = '0';
+      }
+     else if (t>=10 && t<100)  
+      {
+      TTT[2] = TTT[1];
+      TTT[1] = TTT[0];
+      TTT[0] = '0';
+      }
+     //
+  tweetpkt[0]=':';
+  tweetpkt[1]='7';   // 1
+  tweetpkt[2]='3';   // 2
+  tweetpkt[3]='S';   // 3
+  tweetpkt[4]=' ';   // 4
+  tweetpkt[5]=' ';   // 5
+  tweetpkt[6]=' ';   // 6
+  tweetpkt[7]=' ';   // 7
+  tweetpkt[8]=' ';   // 8
+  tweetpkt[9]=' ';   // 9
+  tweetpkt[10]='T';   // 1
+  tweetpkt[11]='i';   // 1
+  tweetpkt[12]='d';   // 2
+  tweetpkt[13]='e';   // 3
+  tweetpkt[14]='=';   // 4
+  tweetpkt[15]=TTT[0];   // 5
+  tweetpkt[16]=TTT[1];   // 6
+  tweetpkt[17]=TTT[2];   // 7
+  tweetpkt[18]=',';   // 8
+  tweetpkt[19]=' ';   // 9
+  tweetpkt[20]='T';   // 10
+  tweetpkt[21]='e';   // 11
+  tweetpkt[22]='m';   // 12
+  tweetpkt[23]='p';   // 13
+  tweetpkt[24]='=';   // 14
+  tweetpkt[25]=PTMP[0];   // 15
+  tweetpkt[26]=PTMP[1];   // 16
+  tweetpkt[27]=PTMP[2];   // 17
+    //lcd.clear();  
+    //lcd.print("tt1=");
+    //lcd.print(tt1);
+    //lcd.print("  ");
+    //lcd.print("tt2=");
+    //lcd.print(tt2);
+    //delay(2000);
+    lcd.clear();
+    lcd.print("TTT=");
+    lcd.print(TTT[0]);
+    lcd.print(TTT[1]);
+    lcd.print(TTT[2]);
+    delay(1000);
+  //
   // Radio transmit the packets
-  // We want Telemetry tide data every 6 mins, and weather every, say, 5th time or 30 minutes
+  // We wa`nt Telemetry tide data every 6 mins, and weather every, say, 5th time or 30 minutes
   // Will just use delay function to get every 6 mins
   // Use mod function to get weather sent. ...993%5=3, 994%5=4,995%5=0, send if 0  
   //
   // Send telemetry pkt every 6 mins
   //
- delay(330000); // 330,000 ms is 330 sec or 5.5 min 
+ delay(330000); // 330,000 ms is 330 sec or 5.5 min
+  lcd.clear();
+  lcd.print(flagRadioTransmit);
+ delay(1000);
+ lcd.clear();
  if (flagRadioTransmit == 1 && n%1 == 0) {
     digitalWrite(13, HIGH);
     delay(100);
@@ -492,11 +568,12 @@ void loop() {
     delay(100);
     digitalWrite(13, LOW);
     lcd.println("Sent Telem Pkt");
-    delay(2000);                  
-  } else {
+    delay(1000);                  
+    } else {
     lcd.println("No send Telem Pkt");   
-    delay(2000);  
+    delay(1000);  
     }
+   lcd.clear();
    //
    // Send Wx packet every 5th time
    //
@@ -511,11 +588,32 @@ void loop() {
     delay(100);
     digitalWrite(13, LOW);
     lcd.println("Sent Wx Pkt");
-    delay(2000);                   
+    delay(1000);                   
   } else {
     lcd.println("No send Wx Pkt");   
-    delay(2000);  
+    delay(1000);  
     }
+   //
+   // Tweet the Wx and Tide every 5th time
+   //
+    if (flagRadioTransmit == 1 && n%5 == 0) {
+    digitalWrite(13, HIGH);
+    delay(100);
+    //
+    for (i=0;i<27;i++){    // Remember to change this to packet size and to not use testpacket!   
+      Serial.print(packet[i]);
+    }
+    Serial.println("");
+    delay(100);
+    digitalWrite(13, LOW);
+    lcd.println("Sent Tweet Pkt");
+    delay(1000);                   
+  } else {
+    lcd.println("No send Tweet Pkt");   
+    delay(1000);  
+    }
+    //
+  lcd.clear();
   if (n>=999){
     n=0;
   } 
