@@ -90,7 +90,6 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
 //
  char linea[300] = "";  // for the GPS packet
  char lineGPS[300] = "";
-// char testpacket[68] = ""; 
 // char comandoGPR[7] = "$GPRMC";
  char GPSholder = 65;
  int byteGPS=-1;
@@ -119,13 +118,15 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
  char SER[3];       // for assembling the packet of 3 integers from n
  char TTT[3];       // for tweeting a "tide"
 // 
- char packet[46];    // This is the ultimate packet sent to the TNC for the location and weather
- char telempkt[8];   // This is the telemetry packet with sonar (water height) data
- char tweetpkt[27];
+ char packet[46];    // This is the ultimate packet sent to the TNC for the location and weather. 0-44 info 45 null so 46 total
+ char telempkt[36] ;   // This is the telemetry packet with sonar (water height) data
+ char tweetpkt[30];    // 0 to 28 is info and 29 is null, so 30 total 
+ char testpacket[47];  // info is contained in 0 to 45, which is 46 addresses, 47th address is for the null character
  // flags
- int flagRadioTransmitWx=1;
- int flagRadioTransmitTelem=1;
- int flagRadioTransmitTweet=1;
+ int flagTestTransmit = 1;  // initialize here but change values below
+ int flagRadioTransmitWx = 1;
+ int flagRadioTransmitTelem = 1;
+ int flagRadioTransmitTweet = 1;
 // 
 //
 // Items needed for barometer and temperature
@@ -164,9 +165,10 @@ void setup(){
 }
 
 void loop() {
-  flagRadioTransmitWx = 1;    // 0 is radio tx off, 1 is tx on
+  flagTestTransmit = 0;
+  flagRadioTransmitWx = 0;    // 0 is radio tx off, 1 is tx on
   flagRadioTransmitTelem = 0;    // 0 is radio tx off, 1 is tx on
-  flagRadioTransmitTweet = 0;    // 0 is radio tx off, 1 is tx on
+  flagRadioTransmitTweet = 1;    // 0 is radio tx off, 1 is tx on
   n = n+1; // start the counter
   //
   digitalWrite(13, LOW);  // 13 high triggers radio transmit
@@ -380,11 +382,11 @@ void loop() {
       templine[i]=Serial.read();
      // lcd.print(templine[i]);
     }
-        for (i=0;i<99;i++){    // Remember to change this to packet size and to not use testpacket!   
-        Serial.print(templine[i]);
-        }
-        Serial.println("");
-        delay(1000);
+  //      for (i=0;i<99;i++){    // Remember to change this to packet size and to not use testpacket!   
+  //      Serial.print(templine[i]);
+   //     }
+   //     Serial.println("");
+   //     delay(1000);
     lcd.setCursor(0,1);
     delay(500);
     lineb[0]=templine[50];  // just used trial and error to get the last readout in templine which is the most recent
@@ -405,16 +407,18 @@ void loop() {
   //
   //   this was pulled from a raw pkt from a weather station   !3839.35N/12120.19W_232/002g006t072r000P000p000h51b10138.VWS-DavisVVue   
   // This worked   String  packet[45] = "!3812.43N/12234.14W_000/000t086b10065L340F+030" ; at least on the th-d72a did not try to digi it
-  //                  012345678901234567890123456789012345678901234567890123456789
-  //                  0         1         2         3         4         5
-  // This worked   char Testpacket[68] = "!3812.43N/12234.14W_000/000t086L340b10065F+030" ;
+  //                                     012345678901234567890123456789012345678901234567890123456789
+  //                                     0         1         2         3         4         5
+  //  testpacket[45] = '!3833.21N/12130.44W_000/000t086L340b10065F+030' ;  cant read it into the char this way see below
+  //                012345678901234567890123456789012345678901234567890123456789
+  //                0         1         2         3         4         5
   // Page 65 of aprs protocol version 1.0, t=056 deg F, Lumin=320, barom=1008.5, Flood=-3.5
   // Has Petaluma coords, need to overwrite data after the wind and gust
   // Can't get Flood to work on aprs.fi anyway, will use telemetry
   //
-//  char packet[] = {'!', '3','8','1','2','.','4','3','N','/','1','2','2','3','4','.','1','4','W','_','.','.','.','/','.','.','.','t','0','8','8','b','1','0','0','7','5','L','3','4','0','F','+','0','3','0'} ;  
-  //                  0    1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   67890123456789
-  //                  0                                        1                                       2                                       3                                       4                           5
+char testpacket[47] = {'!', '3','8','3','3','.','2','1','N','/','1','2','1','3','0','.','4','4','W','_','.','.','.','/','.','.','.','t','0','8','8','b','1','0','0','7','5','L','3','4','0','F','+','0','3','0'} ;  
+         //             0    1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5  6   7   890123456789
+         //             0                                        1                                       2                                       3                                       4                           5
 //       lcd.print(SYMBOLTABLEID); //Symbol Table ID from void set above  Need sim for the ! and the _
   packet[0]='!';
     for (i=1;i<19;i++){    
@@ -483,6 +487,32 @@ void loop() {
   telempkt[6]=lineb[0] ; 
   telempkt[7]=lineb[1] ;
   telempkt[8]=lineb[2] ;
+  //  not sure I need to do this beyond here, testing
+  telempkt[9]=',' ;
+  telempkt[10]='0' ;
+  telempkt[11]='0' ;
+  telempkt[12]='0' ;
+  telempkt[13]=',' ;
+  telempkt[14]='0' ;
+  telempkt[15]='0' ;
+  telempkt[16]='0' ; 
+  telempkt[17]=',' ;
+  telempkt[18]='0';
+  telempkt[20]='0' ;
+  telempkt[21]='0';
+  telempkt[22]=',' ;
+  telempkt[23]='0' ;
+  telempkt[24]='0' ;
+  telempkt[25]='0' ;
+  telempkt[26]=',' ; 
+  telempkt[27]='0' ;
+  telempkt[28]='0' ;
+    telempkt[29]='0' ;
+  telempkt[30]='0' ;
+  telempkt[31]='0' ;
+  telempkt[32]='0' ;
+  telempkt[33]='0' ;
+  telempkt[34]='0' ;
   //
   // Assemble Tweet to 73S  *******************************************************************************************************************
   //
@@ -519,24 +549,25 @@ void loop() {
   tweetpkt[7]=' ';   // 7
   tweetpkt[8]=' ';   // 8
   tweetpkt[9]=' ';   // 9
-  tweetpkt[10]='T';   // 1
-  tweetpkt[11]='i';   // 1
-  tweetpkt[12]='d';   // 2
-  tweetpkt[13]='e';   // 3
-  tweetpkt[14]='=';   // 4
-  tweetpkt[15]=TTT[0];   // 5
-  tweetpkt[16]=TTT[1];   // 6
-  tweetpkt[17]=TTT[2];   // 7
-  tweetpkt[18]=',';   // 8
-  tweetpkt[19]=' ';   // 9
-  tweetpkt[20]='T';   // 10
-  tweetpkt[21]='e';   // 11
-  tweetpkt[22]='m';   // 12
-  tweetpkt[23]='p';   // 13
-  tweetpkt[24]='=';   // 14
-  tweetpkt[25]=PTMP[0];   // 15
-  tweetpkt[26]=PTMP[1];   // 16
-  tweetpkt[27]=PTMP[2];   // 17
+  tweetpkt[10]=':';
+  tweetpkt[11]='T';   // 1
+  tweetpkt[12]='i';   // 1
+  tweetpkt[13]='d';   // 2
+  tweetpkt[14]='e';   // 3
+  tweetpkt[15]='=';   // 4
+  tweetpkt[16]=TTT[0];   // 5
+  tweetpkt[17]=TTT[1];   // 6
+  tweetpkt[18]=TTT[2];   // 7
+  tweetpkt[19]=',';   // 8
+  tweetpkt[20]=' ';   // 9
+  tweetpkt[21]='T';   // 10
+  tweetpkt[22]='e';   // 11
+  tweetpkt[23]='m';   // 12
+  tweetpkt[24]='p';   // 13
+  tweetpkt[25]='=';   // 14
+  tweetpkt[26]=PTMP[0];   // 15
+  tweetpkt[27]=PTMP[1];   // 16
+  tweetpkt[28]=PTMP[2];   // 17
     //lcd.clear();  
     //lcd.print("tt1=");
     //lcd.print(tt1);
@@ -560,21 +591,57 @@ void loop() {
   //
  delay(3300); // 330,000 ms is 330 sec or 5.5 min
   lcd.clear();
-  // lcd.print(flagRadioTransmitTelem);
-  // delay(1000);
-  // lcd.clear();
+  //
+   if (flagTestTransmit == 1) {
+    digitalWrite(13, HIGH);
+    delay(500);
+    //
+    for (i=0;i<46;i++){       
+      Serial.print(testpacket[i]);
+    }
+    Serial.println("");
+    delay(2000);
+    digitalWrite(13, LOW);
+    lcd.println("Sent Test Pkt");
+    delay(1000); 
+// .......................................................
+      lcd.clear();
+      for (i=0;i<15;i++){       
+      lcd.print(testpacket[i]);
+      }
+      lcd.setCursor(0,1);
+      for (i=15;i<31;i++){       
+      lcd.print(testpacket[i]);
+      }
+      delay(5000); 
+      lcd.clear();     
+      for (i=30;i<40;i++){       
+      lcd.print(testpacket[i]);
+      }
+      lcd.setCursor(0,1);
+      for (i=39;i<47;i++){       
+      lcd.print(testpacket[i]);
+      }
+      delay(10000); 
+//  ........................................................    
+    } else {
+    lcd.println("No Test Pkt Sent");   
+    delay(1000);  
+    }
+   lcd.clear();
+  //
  if (flagRadioTransmitTelem == 1 && n%1 == 0) {
     digitalWrite(13, HIGH);
-    delay(100);
+    delay(500);
     //
-    for (i=0;i<8;i++){       
+    for (i=0;i<36;i++){       
       Serial.print(telempkt[i]);
     }
     Serial.println("");
-    delay(100);
+    delay(2000);
     digitalWrite(13, LOW);
     lcd.println("Sent Telem Pkt");
-    delay(1000);                  
+    delay(10000);                  
     } else {
     lcd.println("No send Telem Pkt");   
     delay(1000);  
@@ -585,16 +652,16 @@ void loop() {
    //
     if (flagRadioTransmitWx == 1 && n%1 == 0) {
     digitalWrite(13, HIGH);
-    delay(100);
+    delay(500);
     //
-    for (i=0;i<46;i++){    // Remember to change this to packet size and to not use testpacket!   
+    for (i=0;i<45;i++){    // info from 0 to 44, 45 is null   
       Serial.print(packet[i]);
     }
     Serial.println("");
-    delay(100);
+    delay(2000);
     digitalWrite(13, LOW);
     lcd.println("Sent Wx Pkt:");
-    delay(1000);          
+    delay(10000);          
       lcd.clear();
       for (i=0;i<15;i++){       
       lcd.print(packet[i]);
@@ -623,18 +690,19 @@ void loop() {
    // fifth time as well, put a 1 min gap in
    //
     delay(10000);
-    if (flagRadioTransmitTweet == 1 && n%5 == 0) {
+    if (flagRadioTransmitTweet == 1 && n%1 == 0) {
     digitalWrite(13, HIGH);
-    delay(100);
+    delay(500);
     //
-    for (i=0;i<27;i++){    // Remember to change this to packet size and to not use testpacket!   
-      Serial.print(packet[i]);
+    for (i=0;i<30;i++){    //    
+      Serial.print(tweetpkt[i]);
     }
     Serial.println("");
-    delay(100);
+    delay(2000);
     digitalWrite(13, LOW);
+    lcd.clear();     
     lcd.println("Sent Tweet Pkt");
-    delay(1000);                   
+    delay(10000);                   
   } else {
     lcd.println("No send Tweet Pkt");   
     delay(1000);  
