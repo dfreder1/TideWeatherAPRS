@@ -123,7 +123,9 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
  char telempkt[8];   // This is the telemetry packet with sonar (water height) data
  char tweetpkt[27];
  // flags
- int flagRadioTransmit=1;
+ int flagRadioTransmitWx=1;
+ int flagRadioTransmitTelem=1;
+ int flagRadioTransmitTweet=1;
 // 
 //
 // Items needed for barometer and temperature
@@ -162,7 +164,9 @@ void setup(){
 }
 
 void loop() {
-  flagRadioTransmit = 1;    // 0 is radio tx off, 1 is tx on
+  flagRadioTransmitWx = 1;    // 0 is radio tx off, 1 is tx on
+  flagRadioTransmitTelem = 0;    // 0 is radio tx off, 1 is tx on
+  flagRadioTransmitTweet = 0;    // 0 is radio tx off, 1 is tx on
   n = n+1; // start the counter
   //
   digitalWrite(13, LOW);  // 13 high triggers radio transmit
@@ -343,6 +347,8 @@ void loop() {
   // lcd.println(" mb ");
   b=bmp.readPressure()/100.0-0;
   dtostrf(b,4, 1, BAROM); // float to string in stdlib is dtostrf(FLOAT,WIDTH,PRECSISION,BUFFER);
+  lcd.print(b); 
+  // lcd.print(" ");
   lcd.print(BAROM);
   lcd.println(" mb ");
   delay(1000);
@@ -539,25 +545,25 @@ void loop() {
     //lcd.print(tt2);
     //delay(2000);
     lcd.clear();
-    lcd.print("TTT=");
-    lcd.print(TTT[0]);
-    lcd.print(TTT[1]);
-    lcd.print(TTT[2]);
-    delay(1000);
+    // lcd.print("TTT=");
+    // lcd.print(TTT[0]);
+    // lcd.print(TTT[1]);
+    // lcd.print(TTT[2]);
+    // delay(1000);
   //
   // Radio transmit the packets
-  // We wa`nt Telemetry tide data every 6 mins, and weather every, say, 5th time or 30 minutes
+  // We want Telemetry tide data every 6 mins, and weather every, say, 5th time or 30 minutes
   // Will just use delay function to get every 6 mins
   // Use mod function to get weather sent. ...993%5=3, 994%5=4,995%5=0, send if 0  
   //
   // Send telemetry pkt every 6 mins
   //
- delay(330000); // 330,000 ms is 330 sec or 5.5 min
+ delay(3300); // 330,000 ms is 330 sec or 5.5 min
   lcd.clear();
-  lcd.print(flagRadioTransmit);
- delay(1000);
- lcd.clear();
- if (flagRadioTransmit == 1 && n%1 == 0) {
+  // lcd.print(flagRadioTransmitTelem);
+  // delay(1000);
+  // lcd.clear();
+ if (flagRadioTransmitTelem == 1 && n%1 == 0) {
     digitalWrite(13, HIGH);
     delay(100);
     //
@@ -575,9 +581,9 @@ void loop() {
     }
    lcd.clear();
    //
-   // Send Wx packet every 5th time
+   // Send Wx packet every 5th time make n%5 equal to 0, for every time make n%1 equal to 0
    //
-    if (flagRadioTransmit == 1 && n%5 == 0) {
+    if (flagRadioTransmitWx == 1 && n%1 == 0) {
     digitalWrite(13, HIGH);
     delay(100);
     //
@@ -587,16 +593,37 @@ void loop() {
     Serial.println("");
     delay(100);
     digitalWrite(13, LOW);
-    lcd.println("Sent Wx Pkt");
-    delay(1000);                   
+    lcd.println("Sent Wx Pkt:");
+    delay(1000);          
+      lcd.clear();
+      for (i=0;i<15;i++){       
+      lcd.print(packet[i]);
+      }
+      lcd.setCursor(0,1);
+      for (i=15;i<31;i++){       
+      lcd.print(packet[i]);
+      }
+      delay(5000); 
+      lcd.clear();     
+      for (i=30;i<40;i++){       
+      lcd.print(packet[i]);
+      }
+      lcd.setCursor(0,1);
+      for (i=39;i<47;i++){       
+      lcd.print(packet[i]);
+      }
+      delay(5000); 
+      lcd.clear();     
   } else {
     lcd.println("No send Wx Pkt");   
     delay(1000);  
     }
    //
-   // Tweet the Wx and Tide every 5th time
+   // Tweet the Wx and Tide every 5th time, since Wx packet sent every
+   // fifth time as well, put a 1 min gap in
    //
-    if (flagRadioTransmit == 1 && n%5 == 0) {
+    delay(10000);
+    if (flagRadioTransmitTweet == 1 && n%5 == 0) {
     digitalWrite(13, HIGH);
     delay(100);
     //
