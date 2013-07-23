@@ -87,7 +87,6 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
 //
  char linea[300] = "";  // for the GPS packet
  char lineGPS[300] = "";
-// char testpacket[68] = ""; 
 // char comandoGPR[7] = "$GPRMC";
  char GPSholder = 65;
  int byteGPS=-1;
@@ -119,6 +118,8 @@ SoftwareSerial mySerial = SoftwareSerial(10, 11); // RX, TX  Not using TX 11, so
  char telempkt[8];   // This is the telemetry packet with sonar (water height) data
  // flags
  int flagRadioTransmit;
+ int flagTestMsg;
+ char testMsg[68] = ""; 
 // 
 //
 // Items needed for barometer and temperature
@@ -157,7 +158,8 @@ void setup(){
 }
 
 void loop() {
-  flagRadioTransmit = 1;    // 0 is radio tx off, 1 is tx on
+  flagRadioTransmit = 0;    // 0 is radio tx off, 1 is tx on
+  flagTestMsg = 1;          // 0 is test msg tx off, 1 is test msg on    
   n = n+1; // start the counter
   //
   digitalWrite(13, LOW);  // 13 high triggers radio transmit
@@ -396,10 +398,10 @@ void loop() {
   // This worked   String  packet[45] = "!3812.43N/12234.14W_000/000t086b10065L340F+030" ; at least on the th-d72a did not try to digi it
   //                  012345678901234567890123456789012345678901234567890123456789
   //                  0         1         2         3         4         5
-  // This worked   char Testpacket[68] = "!3812.43N/12234.14W_000/000t086L340b10065F+030" ;
+  // This worked   
+  char testMsg[68] = "!3833.20N/12130.43W_000/000t086L340b10065F+030" ;
   // Page 65 of aprs protocol version 1.0, t=056 deg F, Lumin=320, barom=1008.5, Flood=-3.5
-  // Has Petaluma coords, need to overwrite data after the wind and gust
-  // Can't get Flood to work on aprs.fi anyway, will use telemetry
+  // Can't get Flood to work on aprs.fi, will use telemetry
   //
 //  char packet[] = {'!', '3','8','1','2','.','4','3','N','/','1','2','2','3','4','.','1','4','W','_','.','.','.','/','.','.','.','t','0','8','8','b','1','0','0','7','5','L','3','4','0','F','+','0','3','0'} ;  
   //                  0    1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5   67890123456789
@@ -480,11 +482,27 @@ void loop() {
   //
   // Send telemetry pkt every 6 mins
   //
- delay(330000); // 330,000 ms is 330 sec or 5.5 min 
+ delay(3300); // 330,000 ms is 330 sec or 5.5 min 
+ //
+  if (flagTestMsg == 1) {
+    digitalWrite(13, HIGH);
+    delay(100);
+    for (i=0;i<8;i++){       
+      Serial.print(telempkt[i]);
+    }
+    Serial.println("");
+    delay(100);
+    digitalWrite(13, LOW);
+    lcd.println("Sent Test Msg");
+    delay(2000);                  
+  } else {
+    lcd.println("No send Test Msg");   
+    delay(2000);  
+    }
+    //
  if (flagRadioTransmit == 1 && n%1 == 0) {
     digitalWrite(13, HIGH);
     delay(100);
-    //
     for (i=0;i<8;i++){       
       Serial.print(telempkt[i]);
     }
@@ -503,7 +521,6 @@ void loop() {
     if (flagRadioTransmit == 1 && n%5 == 0) {
     digitalWrite(13, HIGH);
     delay(100);
-    //
     for (i=0;i<46;i++){    // Remember to change this to packet size and to not use testpacket!   
       Serial.print(packet[i]);
     }
