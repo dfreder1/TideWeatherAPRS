@@ -165,7 +165,11 @@ void setup(){
 }
 
 void loop() {
+<<<<<<< HEAD
   flagTestTransmit = 0;
+=======
+  flagTestTransmit = 0;     // 0 is radio tx off, 1 is tx on
+>>>>>>> newfeature
   flagRadioTransmitWx = 0;    // 0 is radio tx off, 1 is tx on
   flagRadioTransmitTelem = 0;    // 0 is radio tx off, 1 is tx on
   flagRadioTransmitTweet = 1;    // 0 is radio tx off, 1 is tx on
